@@ -4,16 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
-	"log"
 	"log/slog"
-	"net"
 	"net/http"
-	"os"
-	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -884,115 +878,116 @@ func (s *Server) loadModel(
 }
 
 func Execute(args []string) error {
-	fs := flag.NewFlagSet("runner", flag.ExitOnError)
-	mpath := fs.String("model", "", "Path to model binary file")
-	ppath := fs.String("mmproj", "", "Path to projector binary file")
-	parallel := fs.Int("parallel", 1, "Number of sequences to handle simultaneously")
-	batchSize := fs.Int("batch-size", 512, "Batch size")
-	nGpuLayers := fs.Int("n-gpu-layers", 0, "Number of layers to offload to GPU")
-	mainGpu := fs.Int("main-gpu", 0, "Main GPU")
-	flashAttention := fs.Bool("flash-attn", false, "Enable flash attention")
-	kvSize := fs.Int("ctx-size", 2048, "Context (or KV cache) size")
-	kvCacheType := fs.String("kv-cache-type", "", "quantization type for KV cache (default: f16)")
-	port := fs.Int("port", 8080, "Port to expose the server on")
-	threads := fs.Int("threads", runtime.NumCPU(), "Number of threads to use during generation")
-	verbose := fs.Bool("verbose", false, "verbose output (default: disabled)")
-	noMmap := fs.Bool("no-mmap", false, "do not memory-map model (slower load but may reduce pageouts if not using mlock)")
-	mlock := fs.Bool("mlock", false, "force system to keep model in RAM rather than swapping or compressing")
-	tensorSplit := fs.String("tensor-split", "", "fraction of the model to offload to each GPU, comma-separated list of proportions")
-	multiUserCache := fs.Bool("multiuser-cache", false, "optimize input cache algorithm for multiple users")
 
-	var lpaths multiLPath
-	fs.Var(&lpaths, "lora", "Path to lora layer file (can be specified multiple times)")
+	// fs := flag.NewFlagSet("runner", flag.ExitOnError)
+	// mpath := fs.String("model", "", "Path to model binary file")
+	// ppath := fs.String("mmproj", "", "Path to projector binary file")
+	// parallel := fs.Int("parallel", 1, "Number of sequences to handle simultaneously")
+	// batchSize := fs.Int("batch-size", 512, "Batch size")
+	// nGpuLayers := fs.Int("n-gpu-layers", 0, "Number of layers to offload to GPU")
+	// mainGpu := fs.Int("main-gpu", 0, "Main GPU")
+	// flashAttention := fs.Bool("flash-attn", false, "Enable flash attention")
+	// kvSize := fs.Int("ctx-size", 2048, "Context (or KV cache) size")
+	// kvCacheType := fs.String("kv-cache-type", "", "quantization type for KV cache (default: f16)")
+	// port := fs.Int("port", 8080, "Port to expose the server on")
+	// threads := fs.Int("threads", runtime.NumCPU(), "Number of threads to use during generation")
+	// verbose := fs.Bool("verbose", false, "verbose output (default: disabled)")
+	// noMmap := fs.Bool("no-mmap", false, "do not memory-map model (slower load but may reduce pageouts if not using mlock)")
+	// mlock := fs.Bool("mlock", false, "force system to keep model in RAM rather than swapping or compressing")
+	// tensorSplit := fs.String("tensor-split", "", "fraction of the model to offload to each GPU, comma-separated list of proportions")
+	// multiUserCache := fs.Bool("multiuser-cache", false, "optimize input cache algorithm for multiple users")
 
-	fs.Usage = func() {
-		fmt.Fprintf(fs.Output(), "Runner usage\n")
-		fs.PrintDefaults()
-	}
-	if err := fs.Parse(args); err != nil {
-		return err
-	}
-	level := slog.LevelInfo
-	if *verbose {
-		level = slog.LevelDebug
-	}
-	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level:     level,
-		AddSource: true,
-		ReplaceAttr: func(_ []string, attr slog.Attr) slog.Attr {
-			if attr.Key == slog.SourceKey {
-				source := attr.Value.Any().(*slog.Source)
-				source.File = filepath.Base(source.File)
-			}
-			return attr
-		},
-	})
-	slog.SetDefault(slog.New(handler))
-	slog.Info("starting go runner")
+	// var lpaths multiLPath
+	// fs.Var(&lpaths, "lora", "Path to lora layer file (can be specified multiple times)")
 
-	llama.BackendInit()
+	// fs.Usage = func() {
+	// 	fmt.Fprintf(fs.Output(), "Runner usage\n")
+	// 	fs.PrintDefaults()
+	// }
+	// if err := fs.Parse(args); err != nil {
+	// 	return err
+	// }
+	// level := slog.LevelInfo
+	// if *verbose {
+	// 	level = slog.LevelDebug
+	// }
+	// handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+	// 	Level:     level,
+	// 	AddSource: true,
+	// 	ReplaceAttr: func(_ []string, attr slog.Attr) slog.Attr {
+	// 		if attr.Key == slog.SourceKey {
+	// 			source := attr.Value.Any().(*slog.Source)
+	// 			source.File = filepath.Base(source.File)
+	// 		}
+	// 		return attr
+	// 	},
+	// })
+	// slog.SetDefault(slog.New(handler))
+	// slog.Info("starting go runner")
 
-	server := &Server{
-		batchSize: *batchSize,
-		parallel:  *parallel,
-		seqs:      make([]*Sequence, *parallel),
-		seqsSem:   semaphore.NewWeighted(int64(*parallel)),
-		status:    ServerStatusLoadingModel,
-	}
+	// llama.BackendInit()
 
-	var tensorSplitFloats []float32
-	if *tensorSplit != "" {
-		splits := strings.Split(*tensorSplit, ",")
-		tensorSplitFloats = make([]float32, len(splits))
-		for i, s := range splits {
-			f, _ := strconv.ParseFloat(s, 32)
-			tensorSplitFloats[i] = float32(f)
-		}
-	}
+	// server := &Server{
+	// 	batchSize: *batchSize,
+	// 	parallel:  *parallel,
+	// 	seqs:      make([]*Sequence, *parallel),
+	// 	seqsSem:   semaphore.NewWeighted(int64(*parallel)),
+	// 	status:    ServerStatusLoadingModel,
+	// }
 
-	params := llama.ModelParams{
-		NumGpuLayers: *nGpuLayers,
-		MainGpu:      *mainGpu,
-		UseMmap:      !*noMmap && lpaths.String() == "",
-		UseMlock:     *mlock,
-		TensorSplit:  tensorSplitFloats,
-		Progress: func(progress float32) {
-			server.progress = progress
-		},
-	}
+	// var tensorSplitFloats []float32
+	// if *tensorSplit != "" {
+	// 	splits := strings.Split(*tensorSplit, ",")
+	// 	tensorSplitFloats = make([]float32, len(splits))
+	// 	for i, s := range splits {
+	// 		f, _ := strconv.ParseFloat(s, 32)
+	// 		tensorSplitFloats[i] = float32(f)
+	// 	}
+	// }
 
-	server.ready.Add(1)
-	go server.loadModel(params, *mpath, lpaths, *ppath, *kvSize, *kvCacheType, *flashAttention, *threads, *multiUserCache)
+	// params := llama.ModelParams{
+	// 	NumGpuLayers: *nGpuLayers,
+	// 	MainGpu:      *mainGpu,
+	// 	UseMmap:      !*noMmap && lpaths.String() == "",
+	// 	UseMlock:     *mlock,
+	// 	TensorSplit:  tensorSplitFloats,
+	// 	Progress: func(progress float32) {
+	// 		server.progress = progress
+	// 	},
+	// }
 
-	server.cond = sync.NewCond(&server.mu)
+	// server.ready.Add(1)
+	// go server.loadModel(params, *mpath, lpaths, *ppath, *kvSize, *kvCacheType, *flashAttention, *threads, *multiUserCache)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// server.cond = sync.NewCond(&server.mu)
 
-	go server.run(ctx)
+	// ctx, cancel := context.WithCancel(context.Background())
+	// defer cancel()
 
-	addr := "127.0.0.1:" + strconv.Itoa(*port)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		fmt.Println("Listen error:", err)
-		return err
-	}
-	defer listener.Close()
+	// go server.run(ctx)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/embedding", server.embeddings)
-	mux.HandleFunc("/completion", server.completion)
-	mux.HandleFunc("/health", server.health)
+	// addr := "127.0.0.1:" + strconv.Itoa(*port)
+	// listener, err := net.Listen("tcp", addr)
+	// if err != nil {
+	// 	fmt.Println("Listen error:", err)
+	// 	return err
+	// }
+	// defer listener.Close()
 
-	httpServer := http.Server{
-		Handler: mux,
-	}
+	// mux := http.NewServeMux()
+	// mux.HandleFunc("/embedding", server.embeddings)
+	// mux.HandleFunc("/completion", server.completion)
+	// mux.HandleFunc("/health", server.health)
 
-	log.Println("Server listening on", addr)
-	if err := httpServer.Serve(listener); err != nil {
-		log.Fatal("server error:", err)
-		return err
-	}
+	// httpServer := http.Server{
+	// 	Handler: mux,
+	// }
+
+	// log.Println("Server listening on", addr)
+	// if err := httpServer.Serve(listener); err != nil {
+	// 	log.Fatal("server error:", err)
+	// 	return err
+	// }
 
 	return nil
 }
